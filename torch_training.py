@@ -39,12 +39,14 @@ validation_dataset = TurbulenceDataset(root_dir='/home/dsteam/PycharmProjects/tu
 
 train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True,
                               num_workers=0)
+
 val_dataloader = DataLoader(validation_dataset, batch_size=config.batch_size, shuffle=True,
                             num_workers=0)
 
 for epoch in range(config.epochs):
-    print(f'Epoch {epoch}/{config.epochs}')
-    epoch_loss = 0
+    print(f'Epoch {epoch}/{config.epochs}...')
+    epoch_train_loss = 0
+    epoch_val_loss = 0
     for batch_idx, batch in enumerate(train_dataloader):
         print(f'Train batch {batch_idx}')
         # Transfer to GPU
@@ -61,16 +63,16 @@ for epoch in range(config.epochs):
         batch_loss.backward()
         optimizer.step()
 
-        epoch_loss += batch_loss
+        epoch_train_loss += batch_loss
         writer.add_scalars('Train', {'loss': batch_loss.item()}, epoch)
 
         del batch_in, batch_gt
 
-    print(f'Epoch {epoch} - Train Loss: {epoch_loss}')
+    print(f'Epoch {epoch} - Train Loss: {epoch_train_loss}')
 
     # Validation
-    for batch_idx, batch in enumerate(val_dataloader):
-        print('Val batch {}\r'.format(batch_idx), end="")
+    for batch_idx, batch in enumerate(train_dataloader):
+        print(f'Val batch {batch_idx}')
 
         # Transfer to GPU
         batch_in, batch_gt = batch['distorted_tensor'], batch['gt_image']
@@ -82,9 +84,13 @@ for epoch in range(config.epochs):
         model.eval()
         with torch.no_grad():
             batch_pred = model(batch_in)
-            val_metric = criterion(batch_pred, batch_gt)
+            batch_loss = criterion(batch_pred, batch_gt)
 
             # Model computations
-            writer.add_scalars('Val', {'loss': val_metric.item()}, epoch)
+            writer.add_scalars('Val', {'loss': batch_loss.item()}, epoch)
+
+            epoch_val_loss += batch_loss
 
         del batch_in, batch_gt
+
+    print(f'Epoch {epoch} - Val Loss: {epoch_val_loss}')
