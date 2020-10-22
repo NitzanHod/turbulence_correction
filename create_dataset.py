@@ -11,7 +11,7 @@ from utils import *
 
 original_folder_path = os.path.normpath('C:/Users/HATAL99/PycharmProjects/model_turbulence/license plate database/')
 original_images = glob(original_folder_path + '/*')
-dest_folder_path_root = os.path.normpath('C:/Users/HATAL99/PycharmProjects/model_turbulence/generated_data_base/')
+dest_folder_path_root = os.path.normpath('C:/Users/HATAL99/PycharmProjects/model_turbulence/train_data_base/')
 os.makedirs(dest_folder_path_root, exist_ok=True)
 
 # paramater of the distortion

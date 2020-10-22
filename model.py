@@ -41,12 +41,13 @@ def U_Net():
     x = inputs
     x = conv_layer(x, 32)
     x = conv_layer(x, 32)
-
+    print(x.shape)
     skips = [x]
     for _ in range(config.n_down_sampling):
         y = down_sampling_layer(skips[-1])
         y = conv_layer(y, 32)
         y = conv_layer(y, 32)
+        print(y.shape)
         skips.append(y)
 
     current_layer_output = skips[-1]
@@ -57,17 +58,23 @@ def U_Net():
         current_layer_output = up_sampling_layer(current_layer_output)
         current_layer_output = conv_layer(current_layer_output, 32)
         current_layer_output = concat([current_layer_output, skip])
+        print(current_layer_output.shape)
 
     # This is the last layer of the model
     last = conv_layer(current_layer_output, 32)
     last = conv_layer(last, 32)
+    print(last.shape)
     last = Lambda(lambda l: K.mean(l, axis=1))(last)
+    print(last.shape)
     last = Conv2D(3, 1)(last)
-
+    print(last.shape)
     model = tf.keras.Model(inputs=inputs, outputs=last)
     return model
 
 
 if __name__ == '__main__':
     myModel = U_Net()
-    print(myModel.summary(line_length=150))
+    # print(myModel.summary(line_length=150))
+    x = tf.zeros((1, 16, 128, 128, 3))
+    y = myModel(x)
+    print(y.shape)

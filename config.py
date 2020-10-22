@@ -1,6 +1,14 @@
 import os
 
-data_main_path_directory = os.path.normpath('/home/dsteam/PycharmProjects/turbulence/generated_data_base/')
-n_frames = 4  # number of distorted image to tile before feeding the model
-batch_size = 1
+data_main_path_directory = os.path.normpath('/train_data_base/')
+
+# image dimensions
+n_frames = 2 # number of distorted image for feeding the model (D)
+batch_size = 1  # (N)
+image_channels = 3  # (C)
+
+# training parameters
 n_down_sampling = 4
+epochs = 200
+initial_lr = 1e-3
+weight_decay = 0

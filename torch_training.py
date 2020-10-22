@@ -1,0 +1,83 @@
+import torch
+from torch import optim
+from torch.utils.data import DataLoader
+from torchvision import transforms
+import datetime
+from torch.nn import L1Loss
+from unet_3d import UNet
+import config
+from torch_loader import FaceLandmarksDataset, NewPad
+
+from tensorboardX import SummaryWriter
+from cuda_utils import set_cuda
+
+data_transforms = {
+    'train': transforms.Compose([
+        NewPad(),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor()
+    ]),
+    'val': transforms.Compose([
+        NewPad(),
+        transforms.ToTensor()
+    ]),
+}
+
+dtype, device = set_cuda()
+
+writer = SummaryWriter(logdir="logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+
+criterion = L1Loss()
+model = UNet().to(device)
+optimizer = optim.Adam(model.parameters(), lr=config.initial_lr, weight_decay=config.weight_decay)
+
+train_dataset = FaceLandmarksDataset(root_dir='/home/dsteam/PycharmProjects/turbulence/train_data_base',
+                                     transform=data_transforms['train'])
+
+validation_dataset = FaceLandmarksDataset(root_dir='/home/dsteam/PycharmProjects/turbulence/val_data_base',
+                                          transform=data_transforms['val'])
+
+train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True,
+                              num_workers=0)
+val_dataloader = DataLoader(validation_dataset, batch_size=config.batch_size, shuffle=True,
+                            num_workers=0)
+
+for epoch in range(config.epochs):
+    print(f'Epoch {epoch}/config.epochs')
+    epoch_loss = 0
+    for batch_idx, batch in enumerate(train_dataloader):
+        print('batch {}\r'.format(batch_idx), end="")
+
+        # Transfer to GPU
+        batch_in, batch_gt = batch['distorted_tensor'], batch['gt_image']
+
+        # TODO: allow >1 batches by editing unsqueeze
+        batch_in = batch_in.type(dtype).to(device).permute(0, 2, 1, 3, 4)
+        batch_gt = batch_gt.type(dtype).to(device).unsqueeze(0).permute(0, 2, 1, 3, 4)
+
+        model.train()
+        optimizer.zero_grad()
+
+        batch_pred = model(batch_in)
+        batch_loss = criterion(batch_pred, batch_gt)
+        batch_loss.backward()
+        optimizer.step()
+
+        epoch_loss += batch_loss
+        writer.add_scalars('Train', {'loss': batch_loss.item()}, epoch)
+
+    print(f'Epoch {epoch} - Train Loss: {epoch_loss}')
+
+    # Validation
+    with torch.set_grad_enabled(False):
+        for batch_in, batch_gt in val_dataloader:
+            # Transfer to GPU
+            batch_in, batch_gt = batch_in.to(device), batch_gt.to(device)
+
+            model.eval()
+
+            batch_pred = model(batch_in)
+            val_metric = criterion(batch_pred, batch_gt)
+
+            # Model computations
+            writer.add_scalars('Val', {'loss': val_metric.item()}, epoch)
