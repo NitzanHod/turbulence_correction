@@ -11,6 +11,7 @@ class Convolution(nn.Module):
         self.batch = nn.BatchNorm3d(out_channels)
 
     def forward(self, x):
+        # print(x.size())
         out = F.relu(self.batch(self.convolution(x)))
 
         return out
@@ -21,25 +22,31 @@ class UpConvolution(nn.Module):
         super(UpConvolution, self).__init__()
 
         self.up_convolution = nn.ConvTranspose3d(in_channels, out_channels,
-                                                 kernel_size=2, stride=2)
+                                                 kernel_size=(1,2,2), stride=2)
 
     # Center crop
     def crop(self, bridge, up):
         batch_size, n_channels, depth, layer_width, layer_height = bridge.size()
         target_batch_size, target_n_channels, target_depth, target_layer_width, target_layer_height = up.size()
 
-        xy = (layer_width - target_layer_width) // 2
+        xy_w = (layer_width - target_layer_width) // 2
+        xy_h = (layer_height - target_layer_height) // 2
         zxy = (depth - target_depth) // 2
+
+        # print('zxy', depth, target_depth,zxy)
         # Returns a smaller block which is the same size than the block in the up part
-        return bridge[:, :, zxy:(zxy + target_depth), xy:(xy + target_layer_width), xy:(xy + target_layer_width)]
+        return bridge[:, :, zxy:(zxy + target_depth), xy_w:(xy_w + target_layer_width), xy_h:(xy_h + target_layer_height)]
 
     def forward(self, x, bridge):
+        # print('x', x.size())
         up = self.up_convolution(x)
+        # print('up', up.size())
+        # print('bridge', bridge.size())
+        crop_bridge = self.crop(bridge, up)
+        # print('crop_bridge', crop_bridge.size())
 
         # Bridge is the opposite block of the up part
-        out = torch.cat((bridge, up), 1)
-
-        return out
+        return torch.cat((crop_bridge, up), 1)
 
 
 class UNet(nn.Module):

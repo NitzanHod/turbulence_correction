@@ -15,7 +15,7 @@ from torchvision import transforms
 import config
 
 
-class FaceLandmarksDataset(Dataset):
+class TurbulenceDataset(Dataset):
     """Face Landmarks dataset."""
 
     def __init__(self, root_dir, transform):
@@ -51,7 +51,7 @@ class FaceLandmarksDataset(Dataset):
         gt_path, in_paths = self.gt_paths[idx], self.in_paths[idx]
         gt_image = io.imread(gt_path)
 
-        # random.shuffle(in_paths)  # shuffle random sequence TODO: uncomment
+        random.shuffle(in_paths)  # shuffle random sequence TODO: uncomment
 
         distorted_tensor_list = []
         for i in range(config.n_frames):
