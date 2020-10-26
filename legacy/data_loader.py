@@ -2,11 +2,9 @@
 Script containing the function returning the tensorflow dataset object.
 """
 import tensorflow as tf
-import numpy as np
 from glob import glob
 import config
-from utils import *
-import tensorflow.keras.backend as K
+from legacy.utils import *
 
 
 def decode_img(img_path):

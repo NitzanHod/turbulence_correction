@@ -88,7 +88,7 @@ def DistortBlur(img, S, sigma_kernel_vertor_field, sigma_blur_image, N=15, M_dis
 
 
 if __name__ == '__main__':
-    image_input = cv2.imread('image_test_2.jpg') / 255.0
+    image_input = cv2.imread('../image_test_2.jpg') / 255.0
     image_input = cv2.resize(image_input, (420, 280))
     distorted_image = DistortBlur(image_input, S=1.0,
                                   sigma_kernel_vertor_field=0.7,

@@ -1,6 +1,6 @@
 import tensorflow as tf
-from model import U_Net
-from data_loader import create_dataset
+from legacy.model import U_Net
+from legacy.data_loader import create_dataset
 import config
 import datetime
 import time

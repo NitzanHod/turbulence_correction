@@ -1,25 +1,64 @@
+import time
+
 import torch
 from torch import optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
 import datetime
+import os
 from torch.nn import L1Loss
 from unet_3d import UNet
 import config
-from torch_loader import TurbulenceDataset, NewPad
+from torch_loader import TurbulenceDataset, PowerPad, RandomHorizontalFlip, ToTensor
 
 from tensorboardX import SummaryWriter
 from cuda_utils import set_cuda
 
+
+def str_pt_to_epoch(storage_path):
+    """
+    Extract the epoch number from weight path
+    :param storage_path: weight path (including the epoch number)
+    :return: epoch number
+    """
+    return int(os.path.splitext(storage_path)[0].split('epoch_')[1])
+
+
+def recover_model():
+    model = UNet().to(device)
+    recovery_epoch = 0
+
+    # get experiment weight paths
+    weights_dir = './weights/{}'.format(config.exp_name)
+
+    os.system('mkdir ./weights')
+    os.system(f'mkdir {weights_dir}')
+
+    # start from latest epoch and load weights from last checkpoint of this experiment
+    exp_weights = os.listdir(weights_dir)
+
+    if len(exp_weights) > 0:
+        latest_epoch = max([str_pt_to_epoch(weight) for weight in exp_weights if weight.endswith('pt')])
+        latest_weight_path = config.storage_path.format(config.exp_name, latest_epoch)
+
+        model.load_state_dict(torch.load(latest_weight_path, map_location='cuda:0'))
+
+        recovery_epoch = latest_epoch + 1  # we saved latest_epoch, now start latest_epoch + 1
+
+        print(f'Recovered weight from {latest_weight_path}')
+        print(f'Starting from epoch {latest_epoch}...')
+    return model, recovery_epoch
+
+
 data_transforms = {
     'train': transforms.Compose([
-        NewPad(),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor()
+        PowerPad(),
+        RandomHorizontalFlip(),
+        ToTensor()
     ]),
     'val': transforms.Compose([
-        NewPad(),
-        transforms.ToTensor()
+        PowerPad(),
+        ToTensor()
     ]),
 }
 
@@ -28,7 +67,9 @@ dtype, device = set_cuda()
 writer = SummaryWriter(logdir="logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 
 criterion = L1Loss()
-model = UNet().to(device)
+
+model, recovery_epoch = recover_model()
+
 optimizer = optim.Adam(model.parameters(), lr=config.initial_lr, weight_decay=config.weight_decay)
 
 train_dataset = TurbulenceDataset(root_dir='/home/dsteam/PycharmProjects/turbulence/train_data_base',
@@ -43,10 +84,11 @@ train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuff
 val_dataloader = DataLoader(validation_dataset, batch_size=config.batch_size, shuffle=True,
                             num_workers=0)
 
-for epoch in range(config.epochs):
+for epoch in range(recovery_epoch, config.epochs):
     print(f'Epoch {epoch}/{config.epochs}...')
     epoch_train_loss = 0
     epoch_val_loss = 0
+    start_epoch = time.time()
     for batch_idx, batch in enumerate(train_dataloader):
         print(f'Train batch {batch_idx}')
         # Transfer to GPU
@@ -64,7 +106,7 @@ for epoch in range(config.epochs):
         optimizer.step()
 
         epoch_train_loss += batch_loss
-        writer.add_scalars('Train', {'loss': batch_loss.item()}, epoch)
+        writer.add_scalars(f'{config.exp_name}-Train', {'L1': batch_loss.item()}, epoch)
 
         del batch_in, batch_gt
 
@@ -87,10 +129,15 @@ for epoch in range(config.epochs):
             batch_loss = criterion(batch_pred, batch_gt)
 
             # Model computations
-            writer.add_scalars('Val', {'loss': batch_loss.item()}, epoch)
+            writer.add_scalars(f'{config.exp_name}-Val', {'L1': batch_loss.item()}, epoch)
 
             epoch_val_loss += batch_loss
 
         del batch_in, batch_gt
 
     print(f'Epoch {epoch} - Val Loss: {epoch_val_loss}')
+
+    writer.add_scalars(f'{config.exp_name}-Profiling', {'Epoch Time': time.time() - start_epoch}, epoch)
+    if epoch % config.save_freq == 0:
+        with open(config.storage_path.format(config.exp_name, epoch), 'wb') as f:
+            torch.save(model.state_dict(), f)

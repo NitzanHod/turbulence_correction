@@ -2,12 +2,10 @@
 Script for creating database of clean + distorted image.
 written by oren, last modification: 25/03/2020
 """
-import numpy as np
 import cv2
-from distort_module import DistortBlur
-import os
+from generation.distort_module import DistortBlur
 from glob import glob
-from utils import *
+from legacy.utils import *
 
 original_folder_path = os.path.normpath('C:/Users/HATAL99/PycharmProjects/model_turbulence/license plate database/')
 original_images = glob(original_folder_path + '/*')
