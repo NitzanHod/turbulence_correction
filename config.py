@@ -9,7 +9,7 @@ image_channels = 3  # (C)
 
 # training parameters
 n_down_sampling = 4
-epochs = 800
+epochs = 1000
 initial_lr = 1e-3
 weight_decay = 0
 
@@ -17,3 +17,4 @@ weight_decay = 0
 exp_name = 'LPR_1'
 save_freq = 10
 storage_path = os.path.normpath('./weights/{}/ckpt_epoch_{}.pt')
+display_freq = 4

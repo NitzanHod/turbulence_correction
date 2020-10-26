@@ -18,7 +18,7 @@ import config
 class TurbulenceDataset(Dataset):
     """Face Landmarks dataset."""
 
-    def __init__(self, root_dir, transform=None):
+    def __init__(self, root_dir, transform=None, writer=None):
         """
         Args:
             csv_file (string): Path to the csv file with annotations.
@@ -45,10 +45,17 @@ class TurbulenceDataset(Dataset):
         self.gt_cache = dict()
         self.in_cache = dict()
 
+        # monitoring caching
+        self.writer = writer
+        self.gt_disk = 0
+        self.in_disk = 0
+        self.total_calls = 0
+
     def __len__(self):
         return len(self.gt_paths)
 
     def __getitem__(self, idx):
+        self.total_calls += 1
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
@@ -59,6 +66,7 @@ class TurbulenceDataset(Dataset):
             gt_image = self.gt_cache[gt_path]
         else:
             gt_image = io.imread(gt_path)
+            self.gt_disk += 1
             self.gt_cache[gt_path] = gt_image
 
         random.shuffle(in_paths)  # shuffle sequence images
@@ -66,11 +74,12 @@ class TurbulenceDataset(Dataset):
         distorted_tensor_list = []
         for in_path in in_paths[:config.n_frames]:  # load up to n_frames images
             if in_path in self.in_cache.keys():
-                distorted_tensor_list.append(self.in_cache[gt_path])
+                distorted_tensor_list.append(self.in_cache[in_path])
             else:
-                distorted_tensor_list.append(io.imread(in_path))
-                self.gt_cache[gt_path] = gt_image
-
+                in_image = io.imread(in_path)
+                self.in_disk += 1
+                distorted_tensor_list.append(in_image)
+                self.in_cache[in_path] = in_image
         sample = dict()
 
         if self.transform:
@@ -78,6 +87,9 @@ class TurbulenceDataset(Dataset):
             sample['distorted_tensor'] = distorted_tensor_list
             sample = self.transform(sample)
 
+        if self.writer:
+            self.writer.add_scalars(f'{config.exp_name}-Profiling-DiskOps', {'GT': self.gt_disk}, self.total_calls)
+            self.writer.add_scalars(f'{config.exp_name}-Profiling-DiskOps', {'In': self.in_disk}, self.total_calls)
         return sample
 
 
